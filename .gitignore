@@ -1,0 +1,12 @@
+__pycache__/
+*.tgz
+runs_build.log
+# runs/: track only the built inputs; everything CASTEP / SLURM writes stays local
+runs/**
+!runs/**/
+!runs/**/*.cell
+runs/**/*-out.cell
+!runs/**/*.param.in
+!runs/**/block.npz
+!runs/**/build_report.json
+!runs/**/build_qa.png

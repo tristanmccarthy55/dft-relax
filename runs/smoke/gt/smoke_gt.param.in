@@ -1,0 +1,20 @@
+! smoke_gt: fixed-cell relax, PBESOL
+! run_relax.slurm copies this to <seed>.param and appends run_time / continuation
+task              : geometryoptimization
+xc_functional     : PBESOL
+cut_off_energy    : 500 eV
+spin_polarised    : false
+fix_occupancy     : true
+elec_energy_tol   : 1e-7 eV
+max_scf_cycles    : 200
+geom_method       : lbfgs
+geom_max_iter     : 3
+geom_force_tol    : 0.02 eV/ang
+geom_energy_tol   : 2e-5 eV
+geom_disp_tol     : 1e-3 ang
+calculate_stress  : false
+write_cell_structure: true
+opt_strategy      : speed
+num_dump_cycles   : 0
+backup_interval   : 3600
+iprint            : 1
