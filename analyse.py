@@ -41,20 +41,19 @@ def castep_status(path):
     return "unfinished"
 
 
-def load_relaxed(root, tag, name, order, znum):
-    """Final .geom frame mapped back to site order, or None if absent."""
+def load_relaxed(root, tag, name, start, znum, L):
+    """Final .geom frame mapped back to site order, or None if absent.
+
+    The mapping comes from matching the FIRST frame to the built start (CASTEP re-sorts ions).
+    """
     seed = f"{tag}_{name}"
     geom = os.path.join(root, tag, name, f"{seed}.geom")
     if not os.path.exists(geom):
         return None
     frames = pvk.read_geom(geom)
+    perm = pvk.match_to_start(frames[0], start, znum, L)
     last = frames[-1]
-    sym = np.array([pvk.SYMBOL[int(z)] for z in znum[order]])
-    if len(last["species"]) != len(order) or not (np.array(last["species"]) == sym).all():
-        raise RuntimeError(f"{geom}: ion order differs from the .cell we wrote -- cannot map "
-                           f"back to sites (got {len(last['species'])} ions)")
-    pos = np.empty_like(last["pos"])
-    pos[order] = last["pos"]
+    pos = last["pos"][perm]
     fmax = float(np.linalg.norm(last["force"], axis=1).max()) if len(last["force"]) else np.nan
     return {"pos": pos, "energy_eV": last["energy_eV"], "steps": len(frames) - 1,
             "fmax_eV_A": fmax, "first_energy_eV": frames[0]["energy_eV"],
@@ -95,7 +94,7 @@ def main(argv=None):
     out_dir = args.out or os.path.join(args.root, tag)
 
     start = {k: b[f"start_{k}"] for k in ("gt", "p1", "p2")}
-    relaxed = {k: load_relaxed(args.root, tag, k, order, znum) for k in ("gt", "p1", "p2")}
+    relaxed = {k: load_relaxed(args.root, tag, k, start[k], znum, L) for k in ("gt", "p1", "p2")}
     if relaxed["gt"] is not None:
         ref, ref_name = relaxed["gt"]["pos"], "gt_relaxed"
     else:

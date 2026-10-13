@@ -137,10 +137,13 @@ def test_analysis_end_to_end_on_fake_relaxation():
         # P1 relaxes all the way onto the relaxed GT, P2 only halfway
         fin = {"gt": gt_rel, "p1": gt_rel.copy(),
                "p2": b["start_p2"] + 0.5 * pvk.min_image(gt_rel - b["start_p2"], L)}
+        # CASTEP 24.1 writes ions sorted O, Ti, Pb (seen in the real smoke run), not as given
+        co = np.concatenate([np.where(b["znum"] == z)[0] for z in (8, 22, 82)])
+        sp_c = [pvk.SYMBOL[int(z)] for z in b["znum"][co]]
         for k, E in (("gt", -1000.0), ("p1", -1000.0), ("p2", -999.0)):
             write_fake_geom(os.path.join(d, "smoke", k, f"smoke_{k}.geom"),
-                            [(E + 5, b[f"start_{k}"][order], zero), (E, fin[k][order], zero)],
-                            sp, L)
+                            [(E + 5, b[f"start_{k}"][co], zero), (E, fin[k][co], zero)],
+                            sp_c, L)
         analyse.main([d, "--tag", "smoke"])
         if os.environ.get("KEEP_FAKE_FIG"):
             shutil.copy(os.path.join(d, "smoke", "fig_relax.png"), os.environ["KEEP_FAKE_FIG"])

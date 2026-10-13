@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=96
 #SBATCH --time=48:00:00
-#SBATCH --mem=192G
+#SBATCH --mem=400G
 #SBATCH -p compute
 #
 # Fixed-cell CASTEP geometry optimisation of ONE structure (gt, p1 or p2), run from its own
@@ -22,7 +22,7 @@ cd "${SLURM_SUBMIT_DIR:-$PWD}"
 : "${SEED:?set SEED=<tag>_<name>}"
 : "${RELAX_SCRIPT:?set RELAX_SCRIPT=<abs path to run_relax.slurm>}"
 CHAIN="${CHAIN:-0}"
-MAX_CHAIN="${MAX_CHAIN:-4}"
+MAX_CHAIN="${MAX_CHAIN:-8}"
 WALL_H="${WALL_H:-48}"
 PACK_DIR="${PACK_DIR:-/springbrook/share/physics/phucrh}"
 CASTEP_MODULE="${CASTEP_MODULE:-phys/CASTEP/24.1-foss-2023b}"
@@ -70,7 +70,11 @@ else
   STATUS=FAILED
 fi
 
-# ---- final link: pack the small outputs (never the multi-GB .check)
+# ---- final link: report, then pack the small outputs (never the multi-GB .check). The status
+# lines go first so the packed .out carries them.
+echo "geometry frames: $(nsteps)"
+grep -E "Final (free )?energy|Final Enthalpy" "${SEED}.castep" 2>/dev/null | tail -1
+echo "RELAX STATUS: $STATUS"
 NAME_DIR="$(basename "$PWD")"
 TAG_DIR="$(dirname "$PWD")"
 OUT="${PACK_DIR}/dftrelax_${SEED}_results_$(date +%Y%m%d_%H%M%S).tgz"
@@ -78,7 +82,4 @@ tar czf "$OUT" -C "$(dirname "$TAG_DIR")" \
     --exclude='*.check' --exclude='*.check_bak' --exclude='*.castep_bin' --exclude='*.cst_esp' \
     "$(basename "$TAG_DIR")/${NAME_DIR}" \
     "$(basename "$TAG_DIR")/block.npz" "$(basename "$TAG_DIR")/build_report.json"
-echo "geometry frames: $(nsteps)"
-grep -E "Final (free )?energy|Final Enthalpy" "${SEED}.castep" 2>/dev/null | tail -1
-echo "RELAX STATUS: $STATUS"
 echo "PACKED -> $OUT"

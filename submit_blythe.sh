@@ -6,7 +6,7 @@
 #   bash submit_blythe.sh runs/b2x2x12        # the experiment: 240 atoms each, 48 h links
 #   SEEDS="p2" bash submit_blythe.sh runs/b2x2x12      # resubmit one structure
 #
-# Overrides: NTASKS (96), MEM (192G), WALL_H (48), MAX_CHAIN (4), PACK_DIR ($SHARE/phucrh).
+# Overrides: NTASKS (96), MEM (400G), WALL_H (48), MAX_CHAIN (8), PACK_DIR ($SHARE/phucrh).
 set -euo pipefail
 [ $# -eq 1 ] || { echo "usage: bash submit_blythe.sh runs/<tag>"; exit 1; }
 TAG_DIR="$(cd "$1" && pwd)"
@@ -15,7 +15,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 if [ "$TAG" = smoke ]; then
   NTASKS="${NTASKS:-32}"; MEM="${MEM:-64G}"; WALL_H="${WALL_H:-2}"; MAX_CHAIN="${MAX_CHAIN:-0}"
 fi
-NTASKS="${NTASKS:-96}"; MEM="${MEM:-192G}"; WALL_H="${WALL_H:-48}"; MAX_CHAIN="${MAX_CHAIN:-4}"
+# 400G: CASTEP holds ~1 GB fixed overhead per process and the smoke peaked at 2.3 GB/process;
+# 96 processes on the 240-atom block plausibly need 250-400 GB. Check the estimate in the
+# .castep header after start (README "Memory check").
+NTASKS="${NTASKS:-96}"; MEM="${MEM:-400G}"; WALL_H="${WALL_H:-48}"; MAX_CHAIN="${MAX_CHAIN:-8}"
 PACK_DIR="${PACK_DIR:-/springbrook/share/physics/phucrh}"
 
 for name in ${SEEDS:-gt p1 p2}; do

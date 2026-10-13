@@ -137,13 +137,39 @@ for f in dftrelax_*.tgz; do tar xzf "$f"; done
 It runs on a partial set, and scores against the unrelaxed GT (with a warning) until the GT
 finishes.
 
+## Smoke run (2026-10-13): passed
+
+All three ran on CASTEP 24.1 with PBEsol and stopped after 3 LBFGS steps, as designed. The cell
+was held fixed (6 cell constraints), no symmetry was imposed (1 operation), and the centre of
+mass was constrained. The only warning was the intended 3-step stop.
+
+- **P1's 1.04 Å contact is survivable.** Peak force went 136 → 23 → 7.7 → 5.8 eV/Å, and the
+  contact opened to 1.73 Å by step 2. P1's first SCF took 78 iterations against 25 for the GT, so
+  P1 runs about 3× slower per step early on.
+- The smoke GT starts at 23 eV/Å with a 1.41 Å Pb–O contact. That comes from a box only 2 cells
+  deep along the beam, which glues the block's ends together. The main block's GT starts at 1.66 Å.
+- **CASTEP re-sorts ions in its output (O, Ti, Pb).** `analyse.py` therefore maps the results
+  back to sites by matching the first `.geom` frame to the built start, to 1e-3 Å.
+
 ## Cost
 
-Not measured yet; read it off the smoke run. A 40-atom SCF at 500 eV takes minutes. The
-240-atom block at 700 eV is roughly 50–100× per SCF. Expect 10–30 min per geometry step on
-96 cores and 50–150 steps (P1 starts far from equilibrium), so one to three days per structure,
-three structures in parallel on `compute`. If the compute QOS caps CPUs per user, the three jobs
-queue behind each other; `NTASKS=64` trades speed for running together.
+Measured on the smoke run (40 atoms, 500 eV, 4 k-points, 32 processes): 2.2 s per SCF
+iteration for the GT, about 15–25 iterations per SCF, and 1–2 SCFs per LBFGS step. The main
+block (240 atoms, 700 eV, 2 k-points, 96 processes) is roughly 25–50× dearer per iteration
+after the extra cores. That makes **30–90 min per geometry step**. If P1 needs 100–300 steps,
+that is several 48 h links. `MAX_CHAIN=8` caps a structure at about 16 days; it is a ceiling,
+and each job stops when converged.
+
+**Memory check.** CASTEP reserves about 1 GB of fixed overhead per process, and the smoke peaked
+at 2.3 GB per process, so the main run requests 400 GB. About two minutes after a job starts:
+
+```bash
+sed -n '/MEMORY AND SCRATCH/,/Requirements will/p' runs/b2x2x12/p1/b2x2x12_p1.castep
+```
+
+Take "Approx. total storage required per process" × 96 × 1.5 (the smoke's peak was 1.5× its
+estimate). If that exceeds 400 GB: `scancel`, move the `.castep` aside, and resubmit that
+structure with `MEM=600G`, or with `NTASKS=64`.
 
 ## Caveats
 
@@ -163,9 +189,12 @@ queue behind each other; `NTASKS=64` trades speed for running together.
 4. **P1 starts with impossible bonds.** 16 of 48 Ti–O pairs along the beam start 1.04–1.5 Å apart
    (real ≈ 1.95 Å), from depth noise. That is below the pseudopotential core radii (~1.53 Å), so the
    first steps carry very large forces. The smoke run tests the worst one.
-5. **Relaxation finds the nearest minimum, not the best one.** The outcome is which basin each start
-   falls into, and ΔE says which basin is lower. P2 has no wall to keep, so expect it to fall into
-   a single domain.
+5. **Relaxation finds the nearest minimum, and lower energy is not the same as closer to the truth.**
+   The box holds no SrTiO₃, so nothing makes domain walls favourable, and a single-domain
+   structure is likely the lower-energy state in this box. P2 has no wall to keep, so expect it to
+   fall into a single domain *and* sit lowest in energy. The smoke run already shows this: P2 is
+   56 meV per formula unit below the GT after 3 steps. Judge the result by distance to the relaxed
+   GT and by the Ti off-centring. ΔE only says which basin each start fell into.
 6. **PBEsol, not the PBE of the EELS work.** PBE overstates PbTiO₃'s tetragonality and polar
    distortion. For a structural comparison PBEsol is the standard choice. Switch with
    `Cfg.xc` if you want consistency with `eels/` instead.

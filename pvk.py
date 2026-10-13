@@ -26,7 +26,7 @@ SUB_Z = np.array([82, 22, 8, 8, 8])
 SUB_NAME = ("A", "B", "O1", "O2", "O3")
 SYMBOL = {82: "Pb", 22: "Ti", 8: "O", 38: "Sr"}
 ZNUM = {v: k for k, v in SYMBOL.items()}
-CASTEP_ORDER = (82, 22, 8)          # species order written to the .cell (CASTEP keeps it)
+CASTEP_ORDER = (82, 22, 8)          # species order written to the .cell (CASTEP re-sorts it)
 HARTREE_EV = 27.211386245988
 BOHR_A = 0.529177210903
 
@@ -189,8 +189,8 @@ def min_distance(pos, L):
 def castep_order(sites):
     """Row order that groups atoms by species (Pb, Ti, O) and keeps site order inside each.
 
-    CASTEP reorders ions by species internally; writing them pre-grouped makes its output
-    order identical to ours, so the .geom file maps back to sites with no matching.
+    Only a tidy .cell. CASTEP 24.1 re-sorts species in its output (O, Ti, Pb in the smoke run),
+    so results are mapped back to sites by position (match_to_start), never by order.
     """
     zs = SUB_Z[sites[:, 3]]
     return np.concatenate([np.where(zs == z)[0] for z in CASTEP_ORDER])
@@ -210,6 +210,30 @@ def write_cell(path, pos, znum, L, kgrid, comment=""):
               f"KPOINTS_MP_GRID {kgrid[0]} {kgrid[1]} {kgrid[2]}", ""]
     with open(path, "w") as f:
         f.write("\n".join(lines))
+
+
+def match_to_start(frame0, start, znum, L, tol=1e-3):
+    """@brief Permutation p with frame0["pos"][p[m]] == start[m] for every site m.
+
+    frame0 is the first .geom frame, i.e. the structure CASTEP was given, in CASTEP's own ion
+    order; start is the same structure in site order. Matching is per species, periodic, and
+    must be one-to-one within tol (A) -- anything else means the wrong files were paired.
+    """
+    from scipy.spatial import cKDTree
+    sym = np.array(frame0["species"])
+    p = np.full(len(start), -1)
+    for z in np.unique(znum):
+        rows = np.where(znum == z)[0]
+        ions = np.where(sym == SYMBOL[int(z)])[0]
+        if len(ions) != len(rows):
+            raise RuntimeError(f"{SYMBOL[int(z)]}: {len(ions)} ions in the .geom, "
+                               f"{len(rows)} sites in the block")
+        d, j = cKDTree(np.mod(frame0["pos"][ions], L), boxsize=L).query(np.mod(start[rows], L))
+        if d.max() > tol or len(set(j)) != len(j):
+            raise RuntimeError(f"{SYMBOL[int(z)]}: .geom start does not match the built start "
+                               f"(max offset {d.max():.2e} A, {len(j) - len(set(j))} clashes)")
+        p[rows] = ions[j]
+    return p
 
 
 def read_geom(path):
