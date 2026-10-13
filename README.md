@@ -169,7 +169,12 @@ sed -n '/MEMORY AND SCRATCH/,/Requirements will/p' runs/b2x2x12/p1/b2x2x12_p1.ca
 
 Take "Approx. total storage required per process" × 96 × 1.5 (the smoke's peak was 1.5× its
 estimate). If that exceeds 400 GB: `scancel`, move the `.castep` aside, and resubmit that
-structure with `MEM=600G`, or with `NTASKS=64`.
+structure with `MEM=600G`.
+
+Partition limits (`scontrol show partition compute`, 2026-10-13): `MaxMemPerCPU=4591` MB,
+`MaxTime=2-00:00:00`. 400 GB over 96 tasks is 4.27 GB per CPU, inside the limit. Above
+96 × 4.59 ≈ 430 GB, Slurm adds CPUs to match the memory (600G → about 134 CPUs for the same
+96 tasks). That still works, but costs more of your CPU allowance.
 
 ## Caveats
 
